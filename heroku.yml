@@ -1,0 +1,5 @@
+build:
+  docker:
+    web: Dockerfile
+run:
+  web: echo "step1"; ls; echo "step2"; echo $(pwd); drunkala
