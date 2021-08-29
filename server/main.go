@@ -8,6 +8,8 @@ import (
 	"os"
 	"github.com/gorilla/websocket"
 	"sync"
+	"time"
+	"fmt"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
@@ -73,7 +75,7 @@ func HandleCreate(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 		var createReq CreateReq
 		err := json.NewDecoder(r.Body).Decode(&createReq)
 		if err != nil {
-			WriteError(w, err.Error(), http.StatusBadRequest)
+		WriteError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -103,6 +105,44 @@ func HandleCreate(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 		}
 
 		WriteError(w, "could not create unique room code", http.StatusInternalServerError)
+		return
+	}
+}
+
+func HandleState(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !setupHeaders(&w, r) {
+			return
+		}
+		
+		type StateReq struct {
+			Code string
+		}
+		var stateReq StateReq
+		err := json.NewDecoder(r.Body).Decode(&stateReq)
+		if err != nil {
+			WriteError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if stateReq.Code == "" {
+			WriteError(w, "lobby code missing from join request", http.StatusBadRequest)
+			return
+		}
+
+		rooms.Lock()
+		room, ok := rooms.Rooms[stateReq.Code]
+		rooms.Unlock()
+
+		if !ok {
+			WriteError(w, "tried to get board state for nonexistant lobby", http.StatusBadRequest)
+			return
+		}
+
+		room.Lock()
+		defer room.Unlock()
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(room)
 		return
 	}
 }
@@ -254,7 +294,18 @@ func HandleAction(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 		room.Lock()
 		defer room.Unlock()
 
-		err = room.DoAction(&input)
+		if room.Board.Finished && input.Reset {
+			newRoom, err := NewRoom(room.Code, room.Board.NumPlayers)
+			if err != nil {
+				WriteError(w, "error in creating new game", http.StatusBadRequest)
+				return
+			}
+			room.Board = newRoom.Board
+			rand.Shuffle(len(room.Players), func(i, j int) { room.Players[i], room.Players[j] = room.Players[j], room.Players[i] })
+			room.History = []string{"Game reset!"}
+		} else {
+			err = room.DoAction(&input)
+		}
 
 		if err == nil {
 			room.NotifyPlayers()
@@ -264,6 +315,67 @@ func HandleAction(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+func HandleStream(rooms *LockedRooms, upgrader *websocket.Upgrader) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		codes, ok := r.URL.Query()["code"]
+		if !ok || len(codes) == 0{
+			WriteError(w, "did not have room code in request", http.StatusBadRequest)
+			return
+		}
+		code := codes[0]
+
+		names, ok := r.URL.Query()["name"]
+		if !ok || len(names) == 0 {
+			WriteError(w, "did not have player name in request", http.StatusBadRequest)
+			return
+		}
+		name := names[0]
+
+		rooms.Lock()
+		room, ok := rooms.Rooms[code]
+		rooms.Unlock()
+
+		if !ok {
+			WriteError(w, "tried to start stream for nonexistant lobby", http.StatusBadRequest)
+			return
+		}
+
+		room.Lock()
+		defer room.Unlock()
+
+		type Heartbeat struct {
+			Heartbeat bool `json:"heartbeat"`
+		}
+
+		for _, player := range room.Players {
+			if player.Name == name {
+				ws, err := upgrader.Upgrade(w, r, nil)
+				if err != nil {
+					log.Fatalln(err.Error())
+				}
+				player.Conns[ws] = true
+
+				go func() {
+					ticker := time.NewTicker(500 * time.Millisecond)
+					for {
+						select {
+						case  <-ticker.C:
+							hb := Heartbeat{}
+							errws := ws.WriteJSON(hb)
+							if errws != nil {
+								return
+							}
+						}
+					}
+				}()
+				
+				return
+			}
+		}
+		WriteError(w, "tried to start stream for nonexistant player", http.StatusBadRequest)
 	}
 }
 
@@ -319,5 +431,30 @@ func HandleRule(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 }
 
 func main() {
-	log.Println("Hello World")
+	rand.Seed(time.Now().UnixNano())
+	host := "0.0.0.0"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "4000"
+	}
+
+	rooms := &LockedRooms{Rooms: make(map[string]*Room)}
+
+	checkOrigin := func(r *http.Request)bool{ 
+		{ return true }
+	}
+	upgrader := &websocket.Upgrader{
+		CheckOrigin: checkOrigin,
+	}
+
+	http.HandleFunc("/api/create", HandleCreate(rooms))
+	http.HandleFunc("/api/join", HandleJoin(rooms))
+	http.HandleFunc("/api/input", HandleAction(rooms))
+	http.HandleFunc("/api/state", HandleState(rooms))
+	http.HandleFunc("/api/stream", HandleStream(rooms, upgrader))
+	http.HandleFunc("/api/ping", HandlePing(rooms))
+	http.HandleFunc("/api/rule", HandleRule(rooms))
+	http.Handle("/", http.FileServer(http.Dir("/home/apps/tipsy-planets/client/build")))
+	log.Println("Game server starting on", host, port)
+	log.Println(http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), nil))
 }

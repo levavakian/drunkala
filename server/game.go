@@ -13,12 +13,12 @@ const (
 )
 
 type Hole struct {
-	X float64
-	Y float64
-	OpposingHoleIdx int
-	Player int
-	Winhole bool
-	Stones []int
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	OpposingHoleIdx int `json:"opposing_hole_idx"`
+	Player int `json:"player"`
+	Winhole bool `json:"winhole"`
+	Stones []int `json:"stones"`
 }
 
 type GameBoard struct {
@@ -44,17 +44,20 @@ type Event struct {
 type Rule struct {
 	Event Event `json:"event"`
 	TriggerOnOpponent bool `json:"trigger_on_opponent"`
+	TriggerOnVictim bool `json:"trigger_on_victim"`
 	ScaleWithNum bool `json:"scale_with_num"`
 	EmbedValue bool `json:"embed_value"`
 	Text string `json:"text"`
 	Min int `json:"min"`
 	Max int `json:"max"`
+	CycleValueOnDie bool `json:"mod"`
 }
 
 type Action struct {
 	Code string `json:"code"`
 	Player string `json:"player"`
 	Index int `json:"index"`
+	Reset bool `json:"reset"`
 }
 
 type Player struct {
@@ -69,6 +72,7 @@ type Room struct {
 	Board *GameBoard `json:"board"`
 	History []string `json:"history"`
 	Rules []Rule `json:"rules"`
+	SPMode bool `json:"sp_mode"`
 }
 
 func NewRoom(code string, size int) (*Room, error) {
@@ -83,7 +87,8 @@ func NewRoom(code string, size int) (*Room, error) {
 		Board: board,
 		Rules: NewDefaultRules(),
 		Players: []*Player{},
-		History: []string{},
+		History: []string{"Game started!"},
+		SPMode: false,
 	}, nil
 }
 
@@ -98,7 +103,7 @@ func (r *Room) GetPlayer(name string) (*Player, int) {
 
 func (g *GameBoard) Next(idx int) int {
 	idx = idx + 1
-	if idx > len(g.Holes) {
+	if idx >= len(g.Holes) {
 		idx = 0
 	}
 	return idx
@@ -117,16 +122,49 @@ func (g *GameBoard) PlayerWinholeIdx(pidx int) int {
 	return -1
 }
 
+func ShuffledStoneProvider(num int, chunk int) func()([]int) {
+	stones := make([]int, num)
+	for i := 0; i < num; i++ {
+		stones[i] = i
+	}
+	stones = Shuffle(stones)
+	i := 0
+
+	return func()([]int){
+		if i + chunk > len(stones) {
+			i = 0
+		}
+
+		out := make([]int, chunk)
+		for k, v := range stones[i:i+chunk] {
+			out[k] = v
+		}
+		i = i + chunk
+		return out
+	}
+}
+
 func NewTwoPlayerBoard() *GameBoard {
 	b := &GameBoard{
 		Holes: []*Hole{},
 		NumPlayers: 2,
 		CurrentPlayer: rand.Intn(2),
 	}
+	newStones := ShuffledStoneProvider(12*4, 4)
 
+	for i := 0; i < 6; i++ {
+		b.Holes = append(b.Holes, &Hole{
+			X: -2.5 + float64(i),
+			Y: 1,
+			OpposingHoleIdx: 12 - i,
+			Player: 0,
+			Winhole: false,
+			Stones: newStones(),
+		})
+	}
 	b.Holes = append(b.Holes, &Hole{
-		X: -3.5,
-		Y: -1,
+		X: 3.5,
+		Y: 1,
 		OpposingHoleIdx: -1,
 		Player: 0,
 		Winhole: true,
@@ -134,27 +172,17 @@ func NewTwoPlayerBoard() *GameBoard {
 	})
 	for i := 0; i < 6; i++ {
 		b.Holes = append(b.Holes, &Hole{
-			X: -3.5 + float64(i) + 1.0,
+			X: 2.5 - float64(i),
 			Y: -1,
-			OpposingHoleIdx: 13 - i,
-			Player: 0,
-			Winhole: false,
-			Stones: []int{},
-		})
-	}
-	for i := 0; i < 6; i++ {
-		b.Holes = append(b.Holes, &Hole{
-			X: -3.5 + 6 - float64(i) + 1.0,
-			Y: -1,
-			OpposingHoleIdx: 7 - i,
+			OpposingHoleIdx: 5 - i,
 			Player: 1,
 			Winhole: false,
-			Stones: []int{},
+			Stones: newStones(),
 		})
 	}
 	b.Holes = append(b.Holes, &Hole{
-		X: 3.5,
-		Y: 1,
+		X: -3.5,
+		Y: -1,
 		OpposingHoleIdx: -1,
 		Player: 1,
 		Winhole: true,
@@ -175,6 +203,7 @@ func NewDefaultRules() []Rule {
 				Eaten: 1,
 				Collected: 1,
 				EndOfRound: 1,
+				Stones: []int{0},
 			},
 			TriggerOnOpponent: true,
 			Text: "give a level 6 confession",
@@ -182,21 +211,7 @@ func NewDefaultRules() []Rule {
 		Rule{
 			Event: Event{
 				Eaten: 1,
-			},
-			TriggerOnOpponent: true,
-			ScaleWithNum: true,
-			Text: "take a drink!",
-		},
-		Rule{
-			Event: Event{
 				Collected: 1,
-			},
-			TriggerOnOpponent: true,
-			ScaleWithNum: true,
-			Text: "take a drink!",
-		},
-		Rule{
-			Event: Event{
 				EndOfRound: 1,
 			},
 			TriggerOnOpponent: true,
@@ -205,18 +220,11 @@ func NewDefaultRules() []Rule {
 		},
 		Rule{
 			Event: Event{
-				EndOfRound: 1,
-			},
-			TriggerOnOpponent: true,
-			ScaleWithNum: true,
-			Text: "take a drink!",
-		},
-		Rule{
-			Event: Event{
-				Repeat: 1,
+				Repeat: 2,
 			},
 			Text: "best/worst category",
-			Max: 1,
+			Max: 2,
+			Min: 2,
 		},
 		Rule{
 			Event: Event{
@@ -228,6 +236,7 @@ func NewDefaultRules() []Rule {
 			Event: Event{
 				Eaten: 1,
 			},
+			TriggerOnVictim: true,
 			Text: "say a nice thing",
 			Max: 1,
 			Min: 1,
@@ -236,6 +245,7 @@ func NewDefaultRules() []Rule {
 			Event: Event{
 				Eaten: 1,
 			},
+			TriggerOnVictim: true,
 			Text: "say a mean thing",
 			Max: 2,
 			Min: 2,
@@ -244,41 +254,61 @@ func NewDefaultRules() []Rule {
 			Event: Event{
 				Eaten: 1,
 			},
-			Text: "ask a dice roll truth",
+			TriggerOnVictim: true,
+			Text: "receive a dice roll truth",
 			Min: 3,
 		},
 		Rule{
 			Event: Event{
 				Victory: 1,
 			},
-			Text: "give a level %s confession",
+			Text: "give a level %d confession",
 			EmbedValue: true,
-			ScaleWithNum: true,
 			Max: -1,
+			CycleValueOnDie: true,
 		},
 	}
 	return rules
 }
 
-func (r *Room) Combine(rule Rule, v int) []string {
+func (r *Room) Combine(ev Event, rule Rule, v int) []string {
 	s := ""
 	if rule.TriggerOnOpponent {
-		for idx, player := range r.Players {
-			if idx == rule.Event.Player {
+		for i := 0; i < r.Board.NumPlayers; i++ {
+			if i == ev.Player {
 				continue
 			}
-			s += player.Name + ","
+			name := fmt.Sprintf("Player %d", i+1)
+			if i < len(r.Players) {
+				name = r.Players[i].Name
+			}
+			s += name + ","
 		}
 		s = s[:len(s)-1] + ": "
+	} else if rule.TriggerOnVictim {
+		index := r.Board.Holes[ev.Index].OpposingHoleIdx
+		if index < 0 {
+			index = ev.Index
+		}
+		owner := r.Board.Holes[index].Player
+		name := fmt.Sprintf("Player %d", owner+1)
+		if owner < len(r.Players) {
+			name = r.Players[owner].Name
+		}
+		s = name + ": "
 	} else {
-		s = r.Players[rule.Event.Player].Name + ": "
+		name := fmt.Sprintf("Player %d", ev.Player+1)
+		if ev.Player < len(r.Players) {
+			name = r.Players[ev.Player].Name
+		}
+		s = name + ": "
 	}
 	s += rule.Text
 	if rule.EmbedValue {
 		s = fmt.Sprintf(s, v)
 	}
 	if rule.ScaleWithNum && v > 1 {
-		out := []string{}
+		out := make([]string, v)
 		for i := 0; i < v; i++ {
 			out[i] = s
 		}
@@ -323,7 +353,13 @@ func (r *Room) ApplyGenericRule(ev Event, rule Rule, f func(Event)int) ([]string
 	if valev < 0 {
 		valev = valev * -1
 	}
-	return r.Combine(rule, valev), true
+	if rule.CycleValueOnDie && valev != 0 {
+		valev = valev - int(float64(valev) / 6.0)*6
+		if valev == 0 {
+			valev = 6
+		}
+	}
+	return r.Combine(ev, rule, valev), true
 }
 
 func (r *Room) ApplyRules(ev Event) []string {
@@ -402,22 +438,32 @@ func (r *Room) HandleEvents(evs []Event) string {
 }
 
 func (r *Room) DoAction(a *Action) error {
-	if len(r.Players) < r.Board.NumPlayers {
+	if r.Board.Finished {
+		return errors.New("game has ended")
+	}
+	if len(r.Players) < r.Board.NumPlayers && !r.SPMode {
 		return errors.New("waiting for more players")
 	}
 	p, pidx := r.GetPlayer(a.Player)
-	if p == nil || pidx != r.Board.CurrentPlayer {
+	if !r.SPMode && (p == nil || pidx != r.Board.CurrentPlayer) {
 		return errors.New("wrong player")
 	}
 	if a.Index < 0 || a.Index >= len(r.Board.Holes) {
 		return errors.New("specified hole does not exist")
 	}
-	if r.Board.Holes[a.Index].Player != pidx {
+	if r.Board.Holes[a.Index].Player != pidx && !r.SPMode {
 		return errors.New("player does not own this hole")
+	}
+	if r.Board.Holes[a.Index].Player != r.Board.CurrentPlayer {
+		return errors.New("current player does not own this hole")
 	}
 	if r.Board.Holes[a.Index].Winhole {
 		return errors.New("winholes can not be moved")
 	}
+	if (len(r.Board.Holes[a.Index].Stones) == 0) {
+		return errors.New("cannot play an empty hole")
+	}
+	player := r.Board.CurrentPlayer
 
 	// Pick up the stones
 	evs := []Event{}
@@ -429,13 +475,13 @@ func (r *Room) DoAction(a *Action) error {
 	for idx, stone := range stones {
 		hIdx = r.Board.Next(hIdx)
 
-		last := idx == len(stones) - 1
-		repeat := last && r.Board.Holes[hIdx].Winhole && r.Board.Holes[hIdx].Player == pidx
+		last := idx == (len(stones) - 1)
+		repeat := last && r.Board.Holes[hIdx].Winhole && r.Board.Holes[hIdx].Player == player
 
 		if repeat {
 			r.Board.RoundsRepeated += 1
-			evs = append(evs, Event{Repeat: r.Board.RoundsRepeated, Player: pidx})
-		} else {
+			evs = append(evs, Event{Repeat: r.Board.RoundsRepeated, Player: player})
+		} else if last {
 			r.Board.RoundsRepeated = 0
 			r.Board.CurrentPlayer = r.Board.NextPlayer(r.Board.CurrentPlayer)
 		}
@@ -443,19 +489,19 @@ func (r *Room) DoAction(a *Action) error {
 		r.Board.Holes[hIdx].Stones = append(r.Board.Holes[hIdx].Stones, stone)
 
 		if r.Board.Holes[hIdx].Winhole {
-			if r.Board.Holes[hIdx].Player == pidx {
-				evs = append(evs, Event{Collected: 1, Index: hIdx, Player: pidx, Stones: []int{stone}})
+			if r.Board.Holes[hIdx].Player == player {
+				evs = append(evs, Event{Collected: 1, Index: hIdx, Player: player, Stones: []int{stone}})
 			} else {
-				evs = append(evs, Event{Owngoal: 1, Index: hIdx, Player: pidx, Stones: []int{stone}})
+				evs = append(evs, Event{Owngoal: 1, Index: hIdx, Player: player, Stones: []int{stone}})
 				evs = append(evs, Event{Collected: 1, Index: hIdx, Player: r.Board.Holes[hIdx].Player, Stones: []int{stone}})
 			}
 		}
 
-		if last && len(r.Board.Holes[hIdx].Stones) == 1 && !r.Board.Holes[hIdx].Winhole{
-			winIdx := r.Board.PlayerWinholeIdx(pidx)
-			oppositeHoleIdx := r.Board.Holes[hIdx].OpposingHoleIdx
+		oppositeHoleIdx := r.Board.Holes[hIdx].OpposingHoleIdx
+		if last && len(r.Board.Holes[hIdx].Stones) == 1 && !r.Board.Holes[hIdx].Winhole && r.Board.Holes[hIdx].Player == player && len(r.Board.Holes[oppositeHoleIdx].Stones) > 0 {
+			winIdx := r.Board.PlayerWinholeIdx(player)
 			numEaten := len(r.Board.Holes[oppositeHoleIdx].Stones)
-			ev := Event{Eaten: numEaten, Player: pidx, Index: hIdx}
+			ev := Event{Eaten: numEaten, Player: player, Index: hIdx}
 
 			ev.Stones = append(ev.Stones, r.Board.Holes[hIdx].Stones...)
 			ev.Stones = append(ev.Stones, r.Board.Holes[oppositeHoleIdx].Stones...)
@@ -534,7 +580,10 @@ func (r *Room) DoAction(a *Action) error {
 	}
 
 	// Handle Rules
-	r.History = append(r.History, r.HandleEvents(evs))
+	nhistory := r.HandleEvents(evs)
+	if len(nhistory) > 0 {
+		r.History = append(r.History, nhistory)
+	}
 
 	return nil
 }

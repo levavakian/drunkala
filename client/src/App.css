@@ -1,3 +1,4 @@
+
 .App {
   text-align: center;
 }
@@ -24,6 +25,13 @@
   color: white;
 }
 
+.App-banner {
+  background-color: #282c34;
+  min-height: 100vh;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
 .App-link {
   color: #61dafb;
 }
@@ -35,4 +43,73 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.card {
+  /* Add shadows to create the "card" effect */
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+}
+
+.buttonlist {
+  margin: 10px;
+  padding: 10px;
+  border: 2px solid #337733;
+  border-radius: 10px;
+  user-select: none;
+}
+
+.cardanim {
+  /* Add shadows to create the "card" effect */
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+  background-color: #33363a;
+  text-align: center;
+}
+
+/* On mouse-over, add a deeper shadow */
+.cardanim:hover {
+  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+}
+
+.cardanim:active {
+  filter: brightness(150%)
+}
+
+.Flexrow {
+  display: flex;
+  flex-direction: row;
+}
+
+.Flexcolumn {
+  display: flex;
+  flex-direction: column;
+}
+
+.scrollable {
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.dot {
+  height: 25px;
+  width: 25px;
+  background-color: #bbb;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+input {
+  font-size:18px;
+  padding:10px 10px 10px 5px;
+  margin: 15px 10px 10px 5px;
+  width: 100px;
+  height: 25px;
+  vertical-align:middle;
+  border:none;
+  border-bottom:1px solid #757575;
+  border-radius: 10px;
+  text-align: center;
+}
+
+input:focus {
+  outline:none;
 }

@@ -1,26 +1,52 @@
 import React from 'react';
-import logo from './logo.svg';
 import './App.css';
+import Lobby from './Lobby'
+import JoinCreate from './JoinCreate'
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+interface AppState {
+  lobby?: string;
+  name?: string;
+}
+
+class App extends React.Component<{}, AppState> {
+  constructor(props: any) {
+    super(props)
+    let state = this.loadState()
+    this.state = {
+      ...state
+    }
+  }
+
+  loadState = () => {
+    return {
+      lobby: undefined,
+      name: undefined
+    }
+  }
+
+  switchLobby = (code: string, name: string) => {
+    this.setState((prevState) => {
+      return {
+        lobby: code,
+        name: name
+      }
+    })
+  }
+
+  render() {
+    if (this.state.lobby && this.state.name) {
+      return (
+        <Lobby
+          lobby={this.state.lobby}
+          name={this.state.name} />
+      )
+    } else {
+      return (
+        <JoinCreate 
+          switchLobby={this.switchLobby} />
+      )
+    }
+  }
 }
 
 export default App;
