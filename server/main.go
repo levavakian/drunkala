@@ -454,7 +454,7 @@ func main() {
 	http.HandleFunc("/api/stream", HandleStream(rooms, upgrader))
 	http.HandleFunc("/api/ping", HandlePing(rooms))
 	http.HandleFunc("/api/rule", HandleRule(rooms))
-	http.Handle("/", http.FileServer(http.Dir("/home/apps/tipsy-planets/client/build")))
+	http.Handle("/", http.FileServer(http.Dir("/home/apps/drunkala/client/build")))
 	log.Println("Game server starting on", host, port)
 	log.Println(http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), nil))
 }

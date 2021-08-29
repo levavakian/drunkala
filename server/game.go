@@ -50,7 +50,7 @@ type Rule struct {
 	Text string `json:"text"`
 	Min int `json:"min"`
 	Max int `json:"max"`
-	CycleValueOnDie bool `json:"mod"`
+	CycleValueOnDie bool `json:"cycle_value_on_die"`
 }
 
 type Action struct {

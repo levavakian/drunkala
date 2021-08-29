@@ -68,7 +68,7 @@ class Canvas extends React.Component<CanvasProps, CanvasState> {
     this.canvasRef = createRef<HTMLCanvasElement>()
     this.state = {
       width: 800,
-      height:800,
+      height:400,
       loaded: false,
     }
   }
@@ -98,7 +98,7 @@ class Canvas extends React.Component<CanvasProps, CanvasState> {
     }
     this.layer?.removeChildren()
 
-    var rectangle = new paper.Rectangle(new Point(0, 0), new paper.Size(800, 800));
+    var rectangle = new paper.Rectangle(new Point(0, 0), new paper.Size(800, 400));
     var cornerSize = new paper.Size(10, 10);
     var shape = new paper.Shape.Rectangle(rectangle, cornerSize);
     shape.strokeColor = new paper.Color('black');
@@ -201,7 +201,7 @@ class Canvas extends React.Component<CanvasProps, CanvasState> {
     this.setState((prevState) => {
       return {
         width: 800,
-        height: 800,
+        height: 400,
         loaded: true
       }
     })

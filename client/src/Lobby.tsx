@@ -6,6 +6,7 @@ import { Room } from './Elements'
 import Canvas from './Canvas'
 import History from './History'
 import Interaction from './Interaction'
+// import Rules from './Rules'
 
 interface LobbyProps {
   lobby: string;
@@ -95,6 +96,7 @@ class Lobby extends React.Component<LobbyProps, LobbyState> {
           { this.state.room ? <Canvas room={this.state.room} player={this.props.name} load_board={() => {this.loadFromServer()}} /> : <></> }
           <Interaction room={this.state.room} name={this.props.name}></Interaction>
           <History room={this.state.room} />
+          {/* <Rules room={this.state.room} name={this.props.name} /> */}
         </div>
       </div>
     )
