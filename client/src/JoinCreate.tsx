@@ -39,14 +39,14 @@ onJoinChange = (event: any) => {
   })
 }
 
-onCreate = (event: any) => {
+onCreate = (event: any, hotseat: boolean) => {
   event.preventDefault()
   event.stopPropagation()
   if (!this.state.name) {
     toast("Set your name before creating lobby")
     return
   }
-  api("POST", "create", {"size": 2}, (e: any) => {
+  api("POST", "create", {"size": 2, "hotseat": hotseat}, (e: any) => {
     if (e.target.status !== 201) {
       toast(e.target.response.error)
       return
@@ -61,6 +61,14 @@ onCreate = (event: any) => {
       this.props.switchLobby(code, name)
     })
   })
+}
+
+onCreateMP = (event: any) => {
+  return this.onCreate(event, false)
+}
+
+onCreateSP = (event: any) => {
+  return this.onCreate(event, true)
 }
 
 onJoin = (event: any) => {
@@ -111,8 +119,9 @@ inner = () => {
             <span className="cardanim buttonlist">Name</span>
             <input value={this.state.name} onChange={this.onNameChange} placeholder="your name"></input>
           </div>
-          <div onClick={this.onCreate} className="cardanim buttonlist">Create</div>
-          <div onClick={this.onDoJoin} className="cardanim buttonlist">Join</div>
+          <div onClick={this.onCreateMP} className="cardanim buttonlist">Multiplayer</div>
+          <div onClick={this.onCreateSP} className="cardanim buttonlist">Hotseat</div>
+          <div onClick={this.onDoJoin} className="cardanim buttonlist">Join Existing</div>
       </div>
     )
   }

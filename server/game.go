@@ -75,7 +75,7 @@ type Room struct {
 	SPMode bool `json:"sp_mode"`
 }
 
-func NewRoom(code string, size int) (*Room, error) {
+func NewRoom(code string, size int, sp_mode bool) (*Room, error) {
 	var board *GameBoard
 	if size == 2 {
 		board = NewTwoPlayerBoard()
@@ -88,7 +88,7 @@ func NewRoom(code string, size int) (*Room, error) {
 		Rules: NewDefaultRules(),
 		Players: []*Player{},
 		History: []string{"Game started!"},
-		SPMode: false,
+		SPMode: sp_mode,
 	}, nil
 }
 

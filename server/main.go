@@ -71,6 +71,7 @@ func HandleCreate(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 
 		type CreateReq struct {
 			Size int
+			Hotseat bool
 		}
 		var createReq CreateReq
 		err := json.NewDecoder(r.Body).Decode(&createReq)
@@ -93,7 +94,7 @@ func HandleCreate(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 				continue
 			}
 
-			nr, err := NewRoom(code.Code, createReq.Size)
+			nr, err := NewRoom(code.Code, createReq.Size, createReq.Hotseat)
 			if err != nil {
 				WriteError(w, err.Error(), http.StatusBadRequest)
 			}
@@ -295,7 +296,7 @@ func HandleAction(rooms *LockedRooms) func(http.ResponseWriter, *http.Request) {
 		defer room.Unlock()
 
 		if room.Board.Finished && input.Reset {
-			newRoom, err := NewRoom(room.Code, room.Board.NumPlayers)
+			newRoom, err := NewRoom(room.Code, room.Board.NumPlayers, room.SPMode)
 			if err != nil {
 				WriteError(w, "error in creating new game", http.StatusBadRequest)
 				return
